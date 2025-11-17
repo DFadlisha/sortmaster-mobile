@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { ScanLine, Keyboard, ArrowLeft, Check } from "lucide-react";
+import BarcodeScanner from "@/components/BarcodeScanner";
 
 const Scan = () => {
   const navigate = useNavigate();
@@ -119,6 +120,23 @@ const Scan = () => {
     }
   };
 
+  const handleBarcodeScanned = (decodedText: string) => {
+    setPartNo(decodedText.trim());
+    toast({
+      title: "Barcode Scanned",
+      description: `Part No: ${decodedText}`,
+      className: "bg-primary text-primary-foreground",
+    });
+  };
+
+  const handleScanError = (error: string) => {
+    toast({
+      title: "Scanner Error",
+      description: error,
+      variant: "destructive",
+    });
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container max-w-2xl mx-auto px-4 py-6 space-y-6">
@@ -158,6 +176,13 @@ const Scan = () => {
           </div>
         </Card>
 
+        {/* Camera Scanner */}
+        {scanMode === "scanner" && (
+          <Card className="p-6">
+            <BarcodeScanner onScanSuccess={handleBarcodeScanned} onScanError={handleScanError} />
+          </Card>
+        )}
+
         {/* Scan Form */}
         <Card className="p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -169,12 +194,13 @@ const Scan = () => {
               <Input
                 id="part-no"
                 type="text"
-                placeholder={scanMode === "scanner" ? "Scan barcode..." : "Enter part number"}
+                placeholder={scanMode === "scanner" ? "Scanned barcode will appear here..." : "Enter part number"}
                 value={partNo}
                 onChange={(e) => setPartNo(e.target.value.trim())}
                 onKeyDown={handleScanInput}
-                autoFocus
+                autoFocus={scanMode === "manual"}
                 className="text-lg h-14"
+                readOnly={scanMode === "scanner"}
               />
             </div>
 
@@ -250,7 +276,7 @@ const Scan = () => {
         <Card className="p-4 bg-muted">
           <p className="text-sm text-muted-foreground">
             {scanMode === "scanner"
-              ? "Scan the part barcode, then enter quantities when prompted."
+              ? "Use the camera to scan barcodes or QR codes. The part number will auto-fill and lookup the part name."
               : "Manually enter the part number, then fill in the quantities."}
           </p>
         </Card>
