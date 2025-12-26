@@ -24,6 +24,7 @@ interface SortingLog {
   quantity_all_sorting: number;
   quantity_ng: number;
   logged_at: string;
+  operator_name?: string;
 }
 
 interface HourlyData {
@@ -33,10 +34,20 @@ interface HourlyData {
   ngRate: number;
 }
 
+interface HourlyOperatorOutput {
+  operator_name: string;
+  hour: string;
+  total_logs: number;
+  total_sorted: number;
+  total_ng: number;
+  ng_rate_percent: number;
+}
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const [logs, setLogs] = useState<SortingLog[]>([]);
   const [hourlyData, setHourlyData] = useState<HourlyData[]>([]);
+  const [hourlyOperatorData, setHourlyOperatorData] = useState<HourlyOperatorOutput[]>([]);
   const [stats, setStats] = useState({
     totalSorted: 0,
     totalNg: 0,
@@ -46,6 +57,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchLogs();
+    fetchHourlyOperatorOutput();
     const channel = supabase
       .channel("sorting-logs-changes")
       .on(
@@ -57,6 +69,7 @@ const Dashboard = () => {
         },
         () => {
           fetchLogs();
+          fetchHourlyOperatorOutput();
         }
       )
       .subscribe();
@@ -81,6 +94,24 @@ const Dashboard = () => {
       }
     } catch (error) {
       console.error("Error fetching logs:", error);
+    }
+  };
+
+  const fetchHourlyOperatorOutput = async () => {
+    try {
+      // Fetch from the hourly_operator_output view
+      const { data, error } = await supabase
+        .from("hourly_operator_output")
+        .select("*")
+        .order("hour", { ascending: false })
+        .limit(50); // Get last 50 hours of data
+
+      if (error) throw error;
+      if (data) {
+        setHourlyOperatorData(data);
+      }
+    } catch (error) {
+      console.error("Error fetching hourly operator output:", error);
     }
   };
 
@@ -260,6 +291,82 @@ const Dashboard = () => {
           </Card>
         </div>
 
+        {/* Hourly Operator Output */}
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold mb-4">Hourly Output Per Operator</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="border-b border-border">
+                <tr>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-muted-foreground">
+                    Operator
+                  </th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-muted-foreground">
+                    Hour
+                  </th>
+                  <th className="text-right py-3 px-4 text-sm font-semibold text-muted-foreground">
+                    Logs
+                  </th>
+                  <th className="text-right py-3 px-4 text-sm font-semibold text-muted-foreground">
+                    Total Sorted
+                  </th>
+                  <th className="text-right py-3 px-4 text-sm font-semibold text-muted-foreground">
+                    NG
+                  </th>
+                  <th className="text-right py-3 px-4 text-sm font-semibold text-muted-foreground">
+                    NG Rate
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {hourlyOperatorData.length > 0 ? (
+                  hourlyOperatorData.map((row, index) => (
+                    <tr key={`${row.operator_name}-${row.hour}-${index}`} className="border-b border-border hover:bg-accent/50">
+                      <td className="py-3 px-4 text-sm font-semibold">
+                        {row.operator_name}
+                      </td>
+                      <td className="py-3 px-4 text-sm">
+                        {new Date(row.hour).toLocaleString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-right font-semibold">
+                        {row.total_logs}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-right font-semibold">
+                        {row.total_sorted}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-right font-semibold text-destructive">
+                        {row.total_ng}
+                      </td>
+                      <td
+                        className={`py-3 px-4 text-sm text-right font-semibold ${
+                          row.ng_rate_percent > 5
+                            ? "text-destructive"
+                            : row.ng_rate_percent > 2
+                            ? "text-warning"
+                            : "text-success"
+                        }`}
+                      >
+                        {row.ng_rate_percent.toFixed(1)}%
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                      No hourly operator data available yet. Start logging sorting activities to see results.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+
         {/* Recent Logs */}
         <Card className="p-6">
           <h3 className="text-lg font-semibold mb-4">Recent Logs</h3>
@@ -269,6 +376,9 @@ const Dashboard = () => {
                 <tr>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-muted-foreground">
                     Time
+                  </th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-muted-foreground">
+                    Operator
                   </th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-muted-foreground">
                     Part No
@@ -294,6 +404,9 @@ const Dashboard = () => {
                     <tr key={log.id} className="border-b border-border hover:bg-accent/50">
                       <td className="py-3 px-4 text-sm">
                         {new Date(log.logged_at).toLocaleTimeString()}
+                      </td>
+                      <td className="py-3 px-4 text-sm font-semibold">
+                        {log.operator_name || 'N/A'}
                       </td>
                       <td className="py-3 px-4 text-sm font-mono">{log.part_no}</td>
                       <td className="py-3 px-4 text-sm">{log.part_name}</td>

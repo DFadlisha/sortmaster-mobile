@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { ScanLine, Keyboard, ArrowLeft, Check } from "lucide-react";
+import { ScanLine, Keyboard, ArrowLeft, Check, Camera, X, Upload } from "lucide-react";
 import BarcodeScanner from "@/components/BarcodeScanner";
+import { Camera as CapacitorCamera, CameraResultType, CameraSource } from "@capacitor/camera";
 
 const Scan = () => {
   const navigate = useNavigate();
@@ -19,6 +20,12 @@ const Scan = () => {
   const [quantityNg, setQuantityNg] = useState("");
   const [isLookingUp, setIsLookingUp] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rejectImage, setRejectImage] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [operatorName, setOperatorName] = useState<string>(() => {
+    // Load operator name from localStorage if available
+    return localStorage.getItem('operator_name') || '';
+  });
 
   // Auto-lookup part when part number is entered
   useEffect(() => {
@@ -70,10 +77,10 @@ const Scan = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!partNo || !partName || !quantityAll || !quantityNg) {
+    if (!partNo || !partName || !quantityAll || !quantityNg || !operatorName) {
       toast({
         title: "Missing Information",
-        description: "Please fill in all fields",
+        description: "Please fill in all fields including operator name",
         variant: "destructive",
       });
       return;
@@ -81,11 +88,19 @@ const Scan = () => {
 
     setIsSubmitting(true);
     try {
+      // Upload image if present
+      let imageUrl: string | null = null;
+      if (rejectImage) {
+        imageUrl = await uploadImageToSupabase(rejectImage, partNo);
+      }
+
       const { error } = await supabase.from("sorting_logs").insert({
         part_no: partNo,
         part_name: partName,
         quantity_all_sorting: parseInt(quantityAll),
         quantity_ng: parseInt(quantityNg),
+        reject_image_url: imageUrl,
+        operator_name: operatorName || null,
       });
 
       if (error) throw error;
@@ -101,6 +116,7 @@ const Scan = () => {
       setPartName("");
       setQuantityAll("");
       setQuantityNg("");
+      setRejectImage(null);
     } catch (error) {
       console.error("Error submitting log:", error);
       toast({
@@ -135,6 +151,102 @@ const Scan = () => {
       description: error,
       variant: "destructive",
     });
+  };
+
+  const takePicture = async () => {
+    try {
+      const image = await CapacitorCamera.getPhoto({
+        quality: 80,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Camera,
+      });
+
+      if (image.base64String) {
+        setRejectImage(`data:image/${image.format};base64,${image.base64String}`);
+        toast({
+          title: "Photo Captured",
+          description: "Image ready to upload",
+          className: "bg-success text-success-foreground",
+        });
+      }
+    } catch (error: any) {
+      console.error("Error taking picture:", error);
+      // User cancelled or error occurred
+      if (error.message !== "User cancelled photos app") {
+        toast({
+          title: "Camera Error",
+          description: "Failed to capture image. Please try again.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  const selectPicture = async () => {
+    try {
+      const image = await CapacitorCamera.getPhoto({
+        quality: 80,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Photos,
+      });
+
+      if (image.base64String) {
+        setRejectImage(`data:image/${image.format};base64,${image.base64String}`);
+        toast({
+          title: "Photo Selected",
+          description: "Image ready to upload",
+          className: "bg-success text-success-foreground",
+        });
+      }
+    } catch (error: any) {
+      console.error("Error selecting picture:", error);
+      // User cancelled or error occurred
+      if (error.message !== "User cancelled photos app") {
+        toast({
+          title: "Selection Error",
+          description: "Failed to select image. Please try again.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  const uploadImageToSupabase = async (base64Image: string, partNo: string): Promise<string | null> => {
+    try {
+      setIsUploadingImage(true);
+      
+      // Convert base64 to blob
+      const response = await fetch(base64Image);
+      const blob = await response.blob();
+      
+      // Generate unique filename
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `rejects/${partNo}_${timestamp}.jpg`;
+      
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('reject-images')
+        .upload(filename, blob, {
+          contentType: 'image/jpeg',
+          upsert: false,
+        });
+
+      if (error) throw error;
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('reject-images')
+        .getPublicUrl(filename);
+
+      return urlData.publicUrl;
+    } catch (error: any) {
+      console.error("Error uploading image:", error);
+      throw error;
+    } finally {
+      setIsUploadingImage(false);
+    }
   };
 
   return (
@@ -186,6 +298,27 @@ const Scan = () => {
         {/* Scan Form */}
         <Card className="p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Operator Name */}
+            <div className="space-y-2">
+              <Label htmlFor="operator-name" className="text-lg font-semibold">
+                Operator Name <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="operator-name"
+                type="text"
+                placeholder="Enter your name"
+                value={operatorName}
+                onChange={(e) => {
+                  const name = e.target.value.trim();
+                  setOperatorName(name);
+                  // Save to localStorage for next time
+                  localStorage.setItem('operator_name', name);
+                }}
+                className="text-lg h-14"
+                required
+              />
+            </div>
+
             {/* Part Number */}
             <div className="space-y-2">
               <Label htmlFor="part-no" className="text-lg font-semibold">
@@ -260,14 +393,70 @@ const Scan = () => {
               />
             </div>
 
+            {/* Reject Image Upload */}
+            <div className="space-y-2">
+              <Label className="text-lg font-semibold">
+                Reject Image (Optional)
+              </Label>
+              <div className="space-y-3">
+                {rejectImage ? (
+                  <div className="relative">
+                    <div className="relative rounded-lg overflow-hidden border-2 border-border">
+                      <img
+                        src={rejectImage}
+                        alt="Reject preview"
+                        className="w-full h-48 object-cover"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-2 right-2"
+                        onClick={() => setRejectImage(null)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={takePicture}
+                      disabled={!partName || isUploadingImage}
+                    >
+                      <Camera className="h-4 w-4 mr-2" />
+                      Take Photo
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={selectPicture}
+                      disabled={!partName || isUploadingImage}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Choose Photo
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Submit Button */}
             <Button
               type="submit"
               size="lg"
               className="w-full h-14 text-lg font-semibold"
-              disabled={!partName || isSubmitting}
+              disabled={!partName || isSubmitting || isUploadingImage}
             >
-              {isSubmitting ? "Logging..." : "Submit Log"}
+              {isUploadingImage
+                ? "Uploading Image..."
+                : isSubmitting
+                ? "Logging..."
+                : "Submit Log"}
             </Button>
           </form>
         </Card>
