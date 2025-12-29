@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ScanLine, Keyboard, ArrowLeft, Check, Camera, X, Upload } from "lucide-react";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from "@capacitor/camera";
+import BottomNav from "@/components/BottomNav";
 
 const Scan = () => {
   const navigate = useNavigate();
@@ -216,15 +217,15 @@ const Scan = () => {
   const uploadImageToSupabase = async (base64Image: string, partNo: string): Promise<string | null> => {
     try {
       setIsUploadingImage(true);
-      
+
       // Convert base64 to blob
       const response = await fetch(base64Image);
       const blob = await response.blob();
-      
+
       // Generate unique filename
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const filename = `rejects/${partNo}_${timestamp}.jpg`;
-      
+
       // Upload to Supabase Storage
       const { data, error } = await supabase.storage
         .from('reject-images')
@@ -250,7 +251,7 @@ const Scan = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#0f172a] text-white pb-24">
       <div className="container max-w-2xl mx-auto px-4 py-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -258,16 +259,16 @@ const Scan = () => {
             variant="ghost"
             size="icon"
             onClick={() => navigate("/")}
-            className="hover:bg-accent"
+            className="hover:bg-white/10 text-white"
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-2xl font-bold text-foreground">Quality Scan</h1>
+          <h1 className="text-2xl font-bold text-white">Quality Scan</h1>
           <div className="w-10" />
         </div>
 
         {/* Mode Toggle */}
-        <Card className="p-4">
+        <Card className="p-4 bg-[#1e293b]/50 backdrop-blur-md border-white/5 text-white">
           <div className="flex gap-2">
             <Button
               variant={scanMode === "scanner" ? "default" : "outline"}
@@ -290,13 +291,13 @@ const Scan = () => {
 
         {/* Camera Scanner */}
         {scanMode === "scanner" && (
-          <Card className="p-6">
+          <Card className="p-6 bg-[#1e293b]/50 backdrop-blur-md border-white/5 text-white">
             <BarcodeScanner onScanSuccess={handleBarcodeScanned} onScanError={handleScanError} />
           </Card>
         )}
 
         {/* Scan Form */}
-        <Card className="p-6">
+        <Card className="p-6 bg-[#1e293b]/50 backdrop-blur-md border-white/5 text-white">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Operator Name */}
             <div className="space-y-2">
@@ -348,9 +349,8 @@ const Scan = () => {
                   type="text"
                   value={partName}
                   readOnly
-                  className={`text-lg h-14 ${
-                    partName ? "bg-success/10 border-success" : "bg-muted"
-                  }`}
+                  className={`text-lg h-14 ${partName ? "bg-success/10 border-success" : "bg-muted"
+                    }`}
                   placeholder={isLookingUp ? "Looking up..." : "Auto-filled from database"}
                 />
                 {partName && (
@@ -455,8 +455,8 @@ const Scan = () => {
               {isUploadingImage
                 ? "Uploading Image..."
                 : isSubmitting
-                ? "Logging..."
-                : "Submit Log"}
+                  ? "Logging..."
+                  : "Submit Log"}
             </Button>
           </form>
         </Card>
@@ -470,6 +470,7 @@ const Scan = () => {
           </p>
         </Card>
       </div>
+      <BottomNav />
     </div>
   );
 };

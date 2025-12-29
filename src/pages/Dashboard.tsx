@@ -3,14 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, TrendingDown, Package, Clock, AlertTriangle, Download, Image as ImageIcon } from "lucide-react";
+import { ArrowLeft, Bell, MoreHorizontal, Plus, TrendingUp, Download, Package, Clock } from "lucide-react";
+import BottomNav from "@/components/BottomNav";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import {
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -572,330 +571,147 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-      <div className="container mx-auto px-4 py-6 space-y-6">
+    <div className="min-h-screen bg-[#0f172a] text-white pb-24 relative overflow-hidden">
+      {/* Background Gradients */}
+      <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-blue-900/20 to-transparent pointer-events-none" />
+
+      <div className="container mx-auto px-4 py-8 relative z-10">
         {/* Header */}
-        <div className="flex items-center justify-between bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm rounded-lg p-4 shadow-sm border border-slate-200/50 dark:border-slate-800">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+            <p className="text-slate-400 text-sm">Real-time production stats</p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={exportToPDF}
+              variant="ghost"
+              size="icon"
+              className="bg-[#1e293b]/50 border border-white/10 text-white hover:bg-white/10 rounded-full w-10 h-10"
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="bg-[#1e293b]/50 border border-white/10 text-white hover:bg-white/10 rounded-full w-10 h-10"
+            >
+              <Bell className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Start Chart Section */}
+        <div className="mb-6">
+          <div className="h-72 w-full bg-[#1e293b]/50 backdrop-blur-md rounded-3xl border border-white/5 p-6 shadow-xl relative overflow-hidden group">
+            <div className="absolute inset-0 bg-gradient-to-t from-blue-500/10 to-transparent pointer-events-none" />
+            <div className="flex justify-between items-start mb-4 relative z-10">
+              <div>
+                <p className="text-slate-400 text-sm font-medium">Hourly Production</p>
+                <h2 className="text-3xl font-bold text-white mt-1">{stats.totalSorted.toLocaleString()} <span className="text-sm font-normal text-slate-500">units</span></h2>
+              </div>
+              <div className="bg-blue-500/20 p-2 rounded-lg">
+                <TrendingUp className="w-5 h-5 text-blue-400" />
+              </div>
+            </div>
+
+            <div className="h-40 w-full mt-4 -ml-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={hourlyData}>
+                  <defs>
+                    <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#fff', borderRadius: '12px' }}
+                    itemStyle={{ color: '#fff' }}
+                    cursor={{ stroke: '#ffffff20' }}
+                  />
+                  <Area type="monotone" dataKey="total" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorTotal)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+        {/* End Chart Section */}
+
+        {/* Middle Stats Section (Cards) */}
+        <div className="grid grid-cols-2 gap-4 mb-8">
+          <div className="bg-[#1e293b]/50 backdrop-blur-md rounded-3xl border border-white/5 p-5 shadow-lg flex flex-col justify-between h-36 relative overflow-hidden group hover:bg-[#1e293b]/70 transition-colors">
+            <div className="absolute right-[-10px] top-[-10px] p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Package className="w-20 h-20 text-white" />
+            </div>
+            <p className="text-slate-400 text-sm font-medium relative z-10">NG Rate</p>
+            <div className="relative z-10">
+              <h3 className="text-2xl font-bold text-white">{stats.ngRate.toFixed(2)}%</h3>
+              <p className={`text-xs mt-1 ${stats.ngRate < 3 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {stats.ngRate < 3 ? 'Within Limits' : 'Action Required'}
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-[#1e293b]/50 backdrop-blur-md rounded-3xl border border-white/5 p-5 shadow-lg flex flex-col justify-between h-36 relative overflow-hidden group hover:bg-[#1e293b]/70 transition-colors">
+            <div className="absolute right-[-10px] top-[-10px] p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Clock className="w-20 h-20 text-white" />
+            </div>
+            <p className="text-slate-400 text-sm font-medium relative z-10">Parts Processed</p>
+            <div className="relative z-10">
+              <h3 className="text-2xl font-bold text-white">{stats.partsProcessed}</h3>
+              <p className="text-xs text-blue-400 mt-1">Unique IDs Scanned</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Horizontal Scroll List (Simulating 'Bills Due' / Status) */}
+        <div className="mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold text-white">Shift Status</h3>
+            <MoreHorizontal className="text-slate-400 w-5 h-5" />
+          </div>
+
+          <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
+            {[
+              { label: "Shift A", sub: "Active", icon: "A", color: "bg-rose-500" },
+              { label: "Housing", sub: "High Priority", icon: "H", color: "bg-amber-500" },
+              { label: "Bracket", sub: "Normal", icon: "B", color: "bg-blue-500" },
+            ].map((item, i) => (
+              <div key={i} className="min-w-[150px] bg-[#1e293b]/50 backdrop-blur-md rounded-3xl border border-white/5 p-4 flex items-center gap-3 shadow-lg hover:scale-105 transition-transform">
+                <div className={`w-10 h-10 rounded-full ${item.color} flex items-center justify-center text-white font-bold shadow-lg`}>
+                  {item.icon}
+                </div>
+                <div>
+                  <p className="text-white font-semibold text-sm">{item.label}</p>
+                  <p className="text-slate-400 text-xs">{item.sub}</p>
+                </div>
+              </div>
+            ))}
+            <div className="min-w-[150px] bg-white/5 border border-white/10 border-dashed rounded-3xl p-4 flex items-center justify-center gap-2 cursor-pointer hover:bg-white/10 transition-colors">
+              <Plus className="w-5 h-5 text-slate-400" />
+              <span className="text-slate-400 text-sm">Add Filter</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Floating Main Action Button */}
+        <div className="fixed bottom-24 left-4 right-4 z-40">
           <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/")}
-            className="hover:bg-primary/10 hover:text-primary"
+            onClick={() => navigate('/scan')}
+            className="w-full py-7 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white text-lg font-bold rounded-2xl shadow-xl shadow-blue-500/20 transition-all active:scale-[0.98]"
           >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">
-            Quality Dashboard
-          </h1>
-          <Button
-            onClick={exportToPDF}
-            variant="default"
-            className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg"
-          >
-            <Download className="h-4 w-4" />
-            Export PDF
+            <div className="flex items-center gap-2">
+              <div className="bg-white/20 p-1 rounded-full">
+                <Plus className="w-4 h-4" />
+              </div>
+              New Inspection Log
+            </div>
           </Button>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="p-6 bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-blue-100 font-medium">Total Sorted</p>
-                <p className="text-3xl font-bold text-white mt-2">
-                  {stats.totalSorted.toLocaleString()}
-                </p>
-              </div>
-              <div className="bg-white/20 rounded-full p-3 backdrop-blur-sm">
-                <Package className="h-8 w-8 text-white" />
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6 bg-gradient-to-br from-red-500 to-red-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-red-100 font-medium">Total NG</p>
-                <p className="text-3xl font-bold text-white mt-2">
-                  {stats.totalNg.toLocaleString()}
-                </p>
-              </div>
-              <div className="bg-white/20 rounded-full p-3 backdrop-blur-sm">
-                <TrendingDown className="h-8 w-8 text-white" />
-              </div>
-            </div>
-          </Card>
-
-          <Card className={`p-6 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 ${stats.ngRate > 5
-            ? "bg-gradient-to-br from-red-500 to-red-600"
-            : stats.ngRate > 2
-              ? "bg-gradient-to-br from-amber-500 to-amber-600"
-              : "bg-gradient-to-br from-emerald-500 to-emerald-600"
-            }`}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className={`text-sm font-medium ${stats.ngRate > 5
-                  ? "text-red-100"
-                  : stats.ngRate > 2
-                    ? "text-amber-100"
-                    : "text-emerald-100"
-                  }`}>
-                  NG Rate
-                </p>
-                <p className="text-3xl font-bold text-white mt-2">
-                  {stats.ngRate.toFixed(1)}%
-                </p>
-              </div>
-              <div className="bg-white/20 rounded-full p-3 backdrop-blur-sm">
-                <AlertTriangle className="h-8 w-8 text-white" />
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6 bg-gradient-to-br from-indigo-500 to-indigo-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-indigo-100 font-medium">Parts Processed</p>
-                <p className="text-3xl font-bold text-white mt-2">
-                  {stats.partsProcessed}
-                </p>
-              </div>
-              <div className="bg-white/20 rounded-full p-3 backdrop-blur-sm">
-                <Clock className="h-8 w-8 text-white" />
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="p-6 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm border-slate-200/50 dark:border-slate-800 shadow-lg">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-blue-600 rounded-full"></div>
-              <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Hourly Production</h3>
-            </div>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={hourlyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="hour" stroke="#64748b" />
-                <YAxis stroke="#64748b" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "white",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: "8px",
-                    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
-                  }}
-                />
-                <Legend />
-                <Bar dataKey="total" fill="#3b82f6" name="Total Sorted" radius={[8, 8, 0, 0]} />
-                <Bar dataKey="ng" fill="#ef4444" name="NG" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </Card>
-
-          <Card className="p-6 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm border-slate-200/50 dark:border-slate-800 shadow-lg">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-1 h-6 bg-gradient-to-b from-amber-500 to-amber-600 rounded-full"></div>
-              <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">NG Rate Trend</h3>
-            </div>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={hourlyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="hour" stroke="#64748b" />
-                <YAxis stroke="#64748b" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "white",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: "8px",
-                    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
-                  }}
-                />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="ngRate"
-                  stroke="#f59e0b"
-                  strokeWidth={3}
-                  name="NG Rate %"
-                  dot={{ fill: "#f59e0b", r: 4 }}
-                  activeDot={{ r: 6 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </Card>
-        </div>
-
-        {/* Hourly Operator Output */}
-        <Card className="p-6 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm border-slate-200/50 dark:border-slate-800 shadow-lg">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-1 h-6 bg-gradient-to-b from-indigo-500 to-indigo-600 rounded-full"></div>
-            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Hourly Output Per Operator</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gradient-to-r from-indigo-500 to-indigo-600">
-                <tr>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-white">
-                    Operator
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-white">
-                    Hour
-                  </th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-white">
-                    Logs
-                  </th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-white">
-                    Total Sorted
-                  </th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-white">
-                    NG
-                  </th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-white">
-                    NG Rate
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {hourlyOperatorData.length > 0 ? (
-                  hourlyOperatorData.map((row, index) => (
-                    <tr key={`${row.operator_name}-${row.hour}-${index}`} className={`border-b border-slate-200 dark:border-slate-700 ${index % 2 === 0 ? "bg-slate-50/50 dark:bg-slate-800/50" : "bg-white dark:bg-slate-900"
-                      } hover:bg-blue-50 dark:hover:bg-slate-800 transition-colors`}>
-                      <td className="py-3 px-4 text-sm font-semibold">
-                        {row.operator_name}
-                      </td>
-                      <td className="py-3 px-4 text-sm">
-                        {new Date(row.hour).toLocaleString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </td>
-                      <td className="py-3 px-4 text-sm text-right font-semibold">
-                        {row.total_logs}
-                      </td>
-                      <td className="py-3 px-4 text-sm text-right font-semibold">
-                        {row.total_sorted}
-                      </td>
-                      <td className="py-3 px-4 text-sm text-right font-semibold text-destructive">
-                        {row.total_ng}
-                      </td>
-                      <td
-                        className={`py-3 px-4 text-sm text-right font-semibold ${row.ng_rate_percent > 5
-                          ? "text-destructive"
-                          : row.ng_rate_percent > 2
-                            ? "text-warning"
-                            : "text-success"
-                          }`}
-                      >
-                        {row.ng_rate_percent.toFixed(1)}%
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={6} className="py-8 text-center text-muted-foreground">
-                      No hourly operator data available yet. Start logging sorting activities to see results.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-
-        {/* Recent Logs */}
-        <Card className="p-6 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm border-slate-200/50 dark:border-slate-800 shadow-lg">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-1 h-6 bg-gradient-to-b from-slate-500 to-slate-600 rounded-full"></div>
-            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Recent Logs</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gradient-to-r from-slate-500 to-slate-600">
-                <tr>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-white">
-                    Time
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-white">
-                    Operator
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-white">
-                    Part No
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-white">
-                    Part Name
-                  </th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-white">
-                    Sorted
-                  </th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-white">
-                    NG
-                  </th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-white">
-                    NG Rate
-                  </th>
-                  <th className="text-center py-3 px-4 text-sm font-semibold text-white">
-                    Image
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs.slice(0, 10).map((log, index) => {
-                  const ngRate = (log.quantity_ng / log.quantity_all_sorting) * 100;
-                  return (
-                    <tr key={log.id} className={`border-b border-slate-200 dark:border-slate-700 ${index % 2 === 0 ? "bg-slate-50/50 dark:bg-slate-800/50" : "bg-white dark:bg-slate-900"
-                      } hover:bg-blue-50 dark:hover:bg-slate-800 transition-colors`}>
-                      <td className="py-3 px-4 text-sm">
-                        {new Date(log.logged_at).toLocaleTimeString()}
-                      </td>
-                      <td className="py-3 px-4 text-sm font-semibold">
-                        {log.operator_name || 'N/A'}
-                      </td>
-                      <td className="py-3 px-4 text-sm font-mono">{log.part_no}</td>
-                      <td className="py-3 px-4 text-sm">{log.part_name}</td>
-                      <td className="py-3 px-4 text-sm text-right font-semibold">
-                        {log.quantity_all_sorting}
-                      </td>
-                      <td className="py-3 px-4 text-sm text-right font-semibold text-destructive">
-                        {log.quantity_ng}
-                      </td>
-                      <td
-                        className={`py-3 px-4 text-sm text-right font-semibold ${ngRate > 5
-                          ? "text-destructive"
-                          : ngRate > 2
-                            ? "text-warning"
-                            : "text-success"
-                          }`}
-                      >
-                        {ngRate.toFixed(1)}%
-                      </td>
-                      <td className="py-3 px-4 text-sm text-center">
-                        {log.reject_image_url ? (
-                          <div className="relative group flex justify-center">
-                            <a href={log.reject_image_url} target="_blank" rel="noopener noreferrer">
-                              <img
-                                src={log.reject_image_url}
-                                alt="NG"
-                                className="h-8 w-8 object-cover rounded border border-slate-200 dark:border-slate-700 hover:scale-150 transition-transform cursor-pointer"
-                              />
-                            </a>
-                          </div>
-                        ) : (
-                          <span className="text-slate-300 dark:text-slate-600">-</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </Card>
       </div>
+      <BottomNav />
     </div>
   );
 };
