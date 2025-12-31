@@ -76,7 +76,8 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchLogs();
-    fetchHourlyOperatorOutput();
+    fetchLogs();
+    // fetchHourlyOperatorOutput(); // Moved to processData
     fetchStatusItems();
     const channel = supabase
       .channel("sorting-logs-changes")
@@ -89,7 +90,8 @@ const Dashboard = () => {
         },
         () => {
           fetchLogs();
-          fetchHourlyOperatorOutput();
+          fetchLogs();
+          // fetchHourlyOperatorOutput(); // Moved to processData
         }
       )
       .subscribe();
@@ -125,7 +127,9 @@ const Dashboard = () => {
           parts_master(part_name)
         `)
         .order("logged_at", { ascending: false })
-        .limit(100);
+        .order("logged_at", { ascending: false });
+      // Removed limit to ensure we get all daily stats for calculation
+      // .limit(100);
 
       if (error) throw error;
       if (data) {
@@ -137,23 +141,8 @@ const Dashboard = () => {
     }
   };
 
-  const fetchHourlyOperatorOutput = async () => {
-    try {
-      // Fetch from the hourly_operator_output view
-      const { data, error } = await supabase
-        .from("hourly_operator_output" as any)
-        .select("*")
-        .order("hour", { ascending: false })
-        .limit(50); // Get last 50 hours of data
-
-      if (error) throw error;
-      if (data) {
-        setHourlyOperatorData(data as unknown as HourlyOperatorOutput[]);
-      }
-    } catch (error) {
-      console.error("Error fetching hourly operator output:", error);
-    }
-  };
+  // Replaced with client-side calculation in processData to ensure no missing View errors
+  // const fetchHourlyOperatorOutput = async () => { ... }
 
   const processData = (data: SortingLog[]) => {
     // Calculate overall stats
@@ -185,6 +174,8 @@ const Dashboard = () => {
       });
     });
 
+    // Correctly closed forEach loop above, no extra line needed here.
+
     const hourlyArray: HourlyData[] = Array.from(hourlyMap.entries())
       .map(([hour, values]) => ({
         hour,
@@ -196,6 +187,41 @@ const Dashboard = () => {
       .reverse();
 
     setHourlyData(hourlyArray);
+
+    // Process Hourly Operator Data (Client-Side)
+    const opHourlyMap = new Map<string, HourlyOperatorOutput>();
+
+    data.forEach((log) => {
+      if (!log.operator_name) return;
+
+      const date = new Date(log.logged_at);
+      const hourKey = date.toISOString().slice(0, 13) + ":00:00"; // Key: YYYY-MM-DDTHH:00:00
+      const key = `${log.operator_name}_${hourKey}`;
+
+      const existing = opHourlyMap.get(key) || {
+        operator_name: log.operator_name,
+        hour: hourKey,
+        total_logs: 0,
+        total_sorted: 0,
+        total_ng: 0,
+        ng_rate_percent: 0
+      };
+
+      existing.total_logs += 1;
+      existing.total_sorted += log.quantity_all_sorting;
+      existing.total_ng += log.quantity_ng;
+
+      opHourlyMap.set(key, existing);
+    });
+
+    const opHourlyArray: HourlyOperatorOutput[] = Array.from(opHourlyMap.values())
+      .map(item => ({
+        ...item,
+        ng_rate_percent: item.total_sorted > 0 ? (item.total_ng / item.total_sorted) * 100 : 0
+      }))
+      .sort((a, b) => b.hour.localeCompare(a.hour) || a.operator_name.localeCompare(b.operator_name));
+
+    setHourlyOperatorData(opHourlyArray);
   };
 
   const exportToPDF = () => {
@@ -740,6 +766,52 @@ const Dashboard = () => {
           </div>
         </div>
 
+        {/* Hourly Operator Output Table (Visible UI) */}
+        <div className="mb-24">
+          <h3 className="text-lg font-bold text-white mb-4">Hourly Operator Performance</h3>
+          <div className="bg-[#1e293b]/50 backdrop-blur-md rounded-3xl border border-white/5 overflow-hidden shadow-lg">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs uppercase bg-white/5 text-slate-400">
+                  <tr>
+                    <th className="px-4 py-3">Operator</th>
+                    <th className="px-4 py-3">Hour</th>
+                    <th className="px-4 py-3 text-right">Sorted</th>
+                    <th className="px-4 py-3 text-right">NG</th>
+                    <th className="px-4 py-3 text-right">Rate</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {hourlyOperatorData.length > 0 ? (
+                    hourlyOperatorData.slice(0, 10).map((row, idx) => (
+                      <tr key={idx} className="hover:bg-white/5 transition-colors">
+                        <td className="px-4 py-3 font-medium text-white">{row.operator_name}</td>
+                        <td className="px-4 py-3 text-slate-400">
+                          {new Date(row.hour).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                        </td>
+                        <td className="px-4 py-3 text-right text-slate-300">{row.total_sorted.toLocaleString()}</td>
+                        <td className="px-4 py-3 text-right text-rose-400">{row.total_ng}</td>
+                        <td className="px-4 py-3 text-right">
+                          <span className={`px-2 py-1 rounded-full text-xs font-bold ${row.ng_rate_percent > 3 ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'
+                            }`}>
+                            {row.ng_rate_percent.toFixed(1)}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-6 text-center text-slate-500">
+                        No data available for today
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
         {/* Floating Main Action Button */}
         <div className="fixed bottom-24 left-4 right-4 z-40">
           <Button
@@ -756,7 +828,7 @@ const Dashboard = () => {
         </div>
       </div>
       <BottomNav />
-    </div>
+    </div >
   );
 };
 

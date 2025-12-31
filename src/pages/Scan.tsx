@@ -10,6 +10,16 @@ import { ScanLine, Keyboard, ArrowLeft, Check, Camera, X, Upload } from "lucide-
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from "@capacitor/camera";
 import BottomNav from "@/components/BottomNav";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+import { saveOfflineLog } from "@/utils/offlineStorage";
+import OfflineSyncIndicator from "@/components/OfflineSyncIndicator";
 
 const Scan = () => {
   const navigate = useNavigate();
@@ -101,11 +111,57 @@ const Scan = () => {
     }
 
     setIsSubmitting(true);
+    let imageUrl: string | null = null;
+    let didUploadImage = false;
+
+    // Helper to attempt offline save
+    const saveToOffline = () => {
+      const saved = saveOfflineLog({
+        part_no: partNo,
+        quantity_all_sorting: parseInt(quantityAll),
+        quantity_ng: parseInt(quantityNg),
+        operator_name: operatorName || null,
+        factory_id: selectedFactory,
+        reject_image_base64: rejectImage, // Save the base64 string
+      });
+
+      if (saved) {
+        toast({
+          title: "Saved Offline",
+          description: "No internet. Log saved locally. Please sync when online.",
+          className: "bg-warning text-warning-foreground",
+        });
+        resetForm();
+      } else {
+        toast({
+          title: "Storage Full",
+          description: "Could not save offline. Please connect to internet.",
+          variant: "destructive",
+        });
+      }
+    }
+
+    // Reset Form Helper
+    const resetForm = () => {
+      setPartNo("");
+      setPartName("");
+      setQuantityAll("");
+      setQuantityNg("");
+      setRejectImage(null);
+    }
+
+    // Check online status first
+    if (!navigator.onLine) {
+      saveToOffline();
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       // Upload image if present
-      let imageUrl: string | null = null;
       if (rejectImage) {
         imageUrl = await uploadImageToSupabase(rejectImage, partNo);
+        didUploadImage = true;
       }
 
       const { error } = await supabase.from("sorting_logs").insert({
@@ -125,19 +181,26 @@ const Scan = () => {
         className: "bg-success text-success-foreground",
       });
 
-      // Reset form
-      setPartNo("");
-      setPartName("");
-      setQuantityAll("");
-      setQuantityNg("");
-      setRejectImage(null);
-    } catch (error) {
+      resetForm();
+    } catch (error: any) {
       console.error("Error submitting log:", error);
-      toast({
-        title: "Submission Error",
-        description: "Failed to log sorting data",
-        variant: "destructive",
-      });
+
+      // If it's a network error (or fetch failure), fall back to offline
+      // Note: Supabase JS client generic errors don't always say "Network Error" clearly, 
+      // but if the insert failed, we can try robustly.
+      // However, if we ALREADY uploaded the image successfully, we shouldn't save the base64 again necessarily,
+      // but to be safe and simple: save everything offline.
+
+      // Check if it looks like a network close/timeout or we decide to treat it as one
+      if (!navigator.onLine || error.message?.includes("fetch") || error.message?.includes("network")) {
+        saveToOffline();
+      } else {
+        toast({
+          title: "Submission Error",
+          description: error.message || "Failed to log sorting data",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -258,6 +321,7 @@ const Scan = () => {
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-white pb-24">
+      <OfflineSyncIndicator />
       <div className="container max-w-2xl mx-auto px-4 py-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -324,6 +388,25 @@ const Scan = () => {
                 className="text-lg h-14"
                 required
               />
+            </div>
+
+            {/* Factory Selection */}
+            <div className="space-y-2">
+              <Label htmlFor="factory" className="text-lg font-semibold">
+                Factory Location <span className="text-destructive">*</span>
+              </Label>
+              <Select value={selectedFactory} onValueChange={setSelectedFactory}>
+                <SelectTrigger className="h-14 text-lg">
+                  <SelectValue placeholder="Select Factory" />
+                </SelectTrigger>
+                <SelectContent>
+                  {factories.map((factory) => (
+                    <SelectItem key={factory.id} value={factory.id}>
+                      {factory.company_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Part Number */}

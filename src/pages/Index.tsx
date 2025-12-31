@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ScanLine, ArrowUpRight, ArrowDownLeft, Wallet, Bell } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 import { supabase } from "@/integrations/supabase/client";
+import OfflineSyncIndicator from "@/components/OfflineSyncIndicator";
 
 interface DashboardStats {
   totalScanned: number;
@@ -92,6 +93,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-white pb-24 relative overflow-hidden">
+      <OfflineSyncIndicator />
       {/* Background Gradients */}
       <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[40%] bg-blue-600/20 rounded-full blur-[100px] pointer-events-none" />
       <div className="absolute bottom-[10%] right-[-10%] w-[40%] h-[40%] bg-indigo-600/20 rounded-full blur-[100px] pointer-events-none" />
