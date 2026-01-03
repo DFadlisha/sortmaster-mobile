@@ -6,9 +6,10 @@ import { Camera, CameraOff } from "lucide-react";
 interface BarcodeScannerProps {
   onScanSuccess: (decodedText: string) => void;
   onScanError?: (error: string) => void;
+  elementId?: string;
 }
 
-const BarcodeScanner = ({ onScanSuccess, onScanError }: BarcodeScannerProps) => {
+const BarcodeScanner = ({ onScanSuccess, onScanError, elementId = "barcode-reader" }: BarcodeScannerProps) => {
   const [isScanning, setIsScanning] = useState(false);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -31,7 +32,8 @@ const BarcodeScanner = ({ onScanSuccess, onScanError }: BarcodeScannerProps) => 
   const startScanning = async () => {
     try {
       setCameraError("");
-      const html5QrCode = new Html5Qrcode("barcode-reader");
+      // Use the custom elementId here
+      const html5QrCode = new Html5Qrcode(elementId);
       scannerRef.current = html5QrCode;
 
       await html5QrCode.start(
@@ -80,10 +82,9 @@ const BarcodeScanner = ({ onScanSuccess, onScanError }: BarcodeScannerProps) => 
     <div className="space-y-4">
       <div className="relative">
         <div
-          id="barcode-reader"
-          className={`w-full rounded-lg overflow-hidden ${
-            isScanning ? "border-2 border-primary" : "bg-muted"
-          }`}
+          id={elementId}
+          className={`w-full rounded-lg overflow-hidden ${isScanning ? "border-2 border-primary" : "bg-muted"
+            }`}
           style={{ minHeight: isScanning ? "300px" : "200px" }}
         />
         {!isScanning && (

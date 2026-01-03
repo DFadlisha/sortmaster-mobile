@@ -29,6 +29,7 @@ const Scan = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rejectImage, setRejectImage] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isNgScanning, setIsNgScanning] = useState(false);
   const [operatorName, setOperatorName] = useState<string>(() => {
     // Load operator name from localStorage if available
     return localStorage.getItem('operator_name') || '';
@@ -359,11 +360,11 @@ const Scan = () => {
         </div>
 
         {/* Mode Toggle */}
-        <Card className="p-4 bg-[#1e293b]/50 backdrop-blur-md border-white/5 text-white">
+        <div className="pb-2">
           <div className="flex gap-2">
             <Button
               variant={scanMode === "scanner" ? "default" : "outline"}
-              className="flex-1"
+              className={`flex-1 ${scanMode !== "scanner" ? "bg-black text-white border-white/20 hover:bg-white/10" : ""}`}
               onClick={() => setScanMode("scanner")}
             >
               <ScanLine className="h-4 w-4 mr-2" />
@@ -371,14 +372,14 @@ const Scan = () => {
             </Button>
             <Button
               variant={scanMode === "manual" ? "default" : "outline"}
-              className="flex-1"
+              className={`flex-1 ${scanMode !== "manual" ? "bg-black text-white border-white/20 hover:bg-white/10" : ""}`}
               onClick={() => setScanMode("manual")}
             >
               <Keyboard className="h-4 w-4 mr-2" />
               Manual
             </Button>
           </div>
-        </Card>
+        </div>
 
         {/* Camera Scanner */}
         {scanMode === "scanner" && (
@@ -406,7 +407,7 @@ const Scan = () => {
                   // Save to localStorage for next time
                   localStorage.setItem('operator_name', name);
                 }}
-                className="text-lg h-14"
+                className="text-lg h-14 bg-black"
                 required
               />
             </div>
@@ -422,7 +423,7 @@ const Scan = () => {
                 placeholder="Enter factory name/location"
                 value={factoryName}
                 onChange={(e) => setFactoryName(e.target.value)}
-                className="text-lg h-14"
+                className="text-lg h-14 bg-black"
               />
             </div>
 
@@ -439,7 +440,7 @@ const Scan = () => {
                 onChange={(e) => setPartNo(e.target.value.trim())}
                 onKeyDown={handleScanInput}
                 autoFocus={scanMode === "manual"}
-                className="text-lg h-14"
+                className="text-lg h-14 bg-black"
                 readOnly={scanMode === "scanner"}
               />
             </div>
@@ -455,7 +456,7 @@ const Scan = () => {
                   type="text"
                   value={partName}
                   onChange={(e) => setPartName(e.target.value)}
-                  className={`text-lg h-14 ${partName ? "bg-success/10 border-success" : "bg-muted"
+                  className={`text-lg h-14 ${partName ? "bg-success/10 border-success" : "bg-black"
                     }`}
                   placeholder="Enter or scan part name"
                 />
@@ -477,7 +478,7 @@ const Scan = () => {
                 placeholder="Enter quantity"
                 value={quantityAll}
                 onChange={(e) => setQuantityAll(e.target.value)}
-                className="text-lg h-14"
+                className="text-lg h-14 bg-black"
               />
             </div>
 
@@ -492,7 +493,7 @@ const Scan = () => {
                 min="0"
                 placeholder="Enter NG quantity"
                 value={quantityNg}
-                className="text-lg h-14"
+                className="text-lg h-14 bg-black"
               />
             </div>
 
@@ -501,14 +502,27 @@ const Scan = () => {
               <Label htmlFor="ng-type" className="text-lg font-semibold">
                 NG Type (Defect Description)
               </Label>
-              <Input
-                id="ng-type"
-                type="text"
-                placeholder="e.g. Scratch, Dent, Color Mismatch"
-                value={ngType}
-                onChange={(e) => setNgType(e.target.value)}
-                className="text-lg h-14"
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="ng-type"
+                  type="text"
+                  placeholder="e.g. Scratch, Dent, Color Mismatch"
+                  value={ngType}
+                  onChange={(e) => setNgType(e.target.value)}
+                  className="text-lg h-14 bg-black"
+                />
+                <Button
+                  type="button"
+                  size="icon"
+                  className="h-14 w-14 shrink-0"
+                  onClick={() => {
+                    setScanMode("manual"); // Stop main scanner to free up camera
+                    setIsNgScanning(true);
+                  }}
+                >
+                  <ScanLine className="h-6 w-6" />
+                </Button>
+              </div>
             </div>
 
             {/* Reject Image Upload */}
@@ -588,6 +602,34 @@ const Scan = () => {
           </p>
         </Card>
       </div>
+      {/* NG Scan Overlay */}
+      {isNgScanning && (
+        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex flex-col items-center justify-center p-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-4 right-4 text-white"
+            onClick={() => setIsNgScanning(false)}
+          >
+            <X className="h-8 w-8" />
+          </Button>
+          <h2 className="text-2xl font-bold mb-6 text-white">Scan NG Type</h2>
+          <Card className="w-full max-w-md p-4 bg-[#1e293b] border-white/10">
+            <BarcodeScanner
+              elementId="ng-scanner-reader"
+              onScanSuccess={(code) => {
+                setNgType(code);
+                setIsNgScanning(false);
+                toast({ title: "NG Type Scanned", description: code });
+                // Auto prompt for picture after scan
+                setTimeout(() => takePicture(), 600);
+              }}
+              onScanError={(err) => console.log(err)}
+            />
+          </Card>
+        </div>
+      )}
+
       <BottomNav />
     </div>
   );
